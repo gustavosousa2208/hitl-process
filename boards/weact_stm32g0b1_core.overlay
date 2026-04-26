@@ -1,0 +1,45 @@
+/ {
+	zephyr,user {
+		pwms = <&pwm_left 0 2040000 PWM_POLARITY_NORMAL>,
+		       <&pwm_right 0 2040000 PWM_POLARITY_NORMAL>;
+		pwm-names = "left", "right";
+		io-channels = <&dac1 1>;
+		io-channel-names = "angle";
+	};
+};
+
+&timers3 {
+	st,prescaler = <63>;
+	status = "okay";
+
+	pwm_left: pwm {
+		status = "okay";
+		pinctrl-0 = <&tim3_ch1_pb4>;
+		pinctrl-names = "default";
+	};
+};
+
+&timers15 {
+	st,prescaler = <63>;
+	status = "okay";
+
+	pwm_right: pwm {
+		status = "okay";
+		pinctrl-0 = <&tim15_ch1_pb14>;
+		pinctrl-names = "default";
+	};
+};
+
+&dac1 {
+	status = "okay";
+	pinctrl-0 = <&dac1_out1_pa4>;
+	pinctrl-names = "default";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@1 {
+		reg = <1>;
+		zephyr,resolution = <12>;
+		zephyr,buffered;
+	};
+};

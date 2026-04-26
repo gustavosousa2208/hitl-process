@@ -1,0 +1,61 @@
+cmake:
+  application:
+    configuration-dir: '/home/gusta/zephyrproject/hitl-processes'
+    source-dir: '/home/gusta/zephyrproject/hitl-processes'
+  board:
+    name: 'nucleo_f767zi'
+    path:
+     - '/home/gusta/zephyrproject/zephyr/boards/st/nucleo_f767zi'
+    qualifiers: 'stm32f767xx'
+    revision: ''
+  devicetree:
+    bindings-dirs:
+     - '/home/gusta/zephyrproject/zephyr/dts/bindings'
+    files:
+     - '/home/gusta/zephyrproject/zephyr/boards/st/nucleo_f767zi/nucleo_f767zi.dts'
+     - '/home/gusta/zephyrproject/hitl-processes/boards/nucleo_f767zi.overlay'
+    include-dirs:
+     - '/home/gusta/zephyrproject/modules/hal/ambiq/dts'
+     - '/home/gusta/zephyrproject/modules/hal/atmel/include'
+     - '/home/gusta/zephyrproject/modules/hal/bouffalolab/include'
+     - '/home/gusta/zephyrproject/modules/hal/bouffalolab/include/zephyr'
+     - '/home/gusta/zephyrproject/modules/hal/gigadevice/include'
+     - '/home/gusta/zephyrproject/modules/hal/microchip/include'
+     - '/home/gusta/zephyrproject/modules/hal/microchip/dts'
+     - '/home/gusta/zephyrproject/modules/hal/nuvoton/dts'
+     - '/home/gusta/zephyrproject/modules/hal/nxp/dts'
+     - '/home/gusta/zephyrproject/modules/hal/stm32/dts'
+     - '/home/gusta/zephyrproject/modules/hal/ti/dts'
+     - '/home/gusta/zephyrproject/zephyr/include'
+     - '/home/gusta/zephyrproject/zephyr/include/zephyr'
+     - '/home/gusta/zephyrproject/zephyr/dts/common'
+     - '/home/gusta/zephyrproject/zephyr/dts/vendor'
+     - '/home/gusta/zephyrproject/zephyr/dts/rx'
+     - '/home/gusta/zephyrproject/zephyr/dts/x86'
+     - '/home/gusta/zephyrproject/zephyr/dts/xtensa'
+     - '/home/gusta/zephyrproject/zephyr/dts/sparc'
+     - '/home/gusta/zephyrproject/zephyr/dts/riscv'
+     - '/home/gusta/zephyrproject/zephyr/dts/posix'
+     - '/home/gusta/zephyrproject/zephyr/dts/arm64'
+     - '/home/gusta/zephyrproject/zephyr/dts/arm'
+     - '/home/gusta/zephyrproject/zephyr/dts/arc'
+     - '/home/gusta/zephyrproject/zephyr/dts'
+    user-files:
+     - '/home/gusta/zephyrproject/hitl-processes/boards/nucleo_f767zi.overlay'
+  kconfig:
+    files:
+     - '/home/gusta/zephyrproject/zephyr/boards/st/nucleo_f767zi/nucleo_f767zi_defconfig'
+     - '/home/gusta/zephyrproject/hitl-processes/prj.conf'
+    user-files:
+     - '/home/gusta/zephyrproject/hitl-processes/prj.conf'
+  toolchain:
+    name: 'zephyr'
+    path: '/home/gusta/zephyr-sdk'
+  zephyr:
+    version: '4.4.99'
+    zephyr-base: '/home/gusta/zephyrproject/zephyr'
+version: '0.1.0'
+west:
+  command: '/home/gusta/zephyrproject/.venv/bin/west build -b nucleo_f767zi -p'
+  topdir: '/home/gusta/zephyrproject'
+  version: '1.5.0'
