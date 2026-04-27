@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <math.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <zephyr/device.h>
 #include <zephyr/devicetree/io-channels.h>
@@ -104,6 +105,14 @@ struct capture_counters {
 	int32_t last_ret;
 };
 
+struct pwm_input_state {
+	uint32_t period_us;
+	uint32_t pulse_us;
+	float command;
+	uint8_t stale_count;
+	bool valid;
+};
+
 static volatile struct dashboard_snapshot dashboard = {
 	.state = PLANT_STATE_STANDBY,
 	.left_pulse_us = ESC_MIN_PULSE_US,
@@ -115,12 +124,31 @@ static volatile bool dashboard_exit_requested;
 static volatile bool dashboard_active;
 static const struct shell *dashboard_shell;
 static struct k_thread dashboard_thread;
+static struct k_thread left_capture_thread;
+static struct k_thread right_capture_thread;
 static struct timing_stats timing = {
 	.min_dt_ms = UINT32_MAX,
 };
 static struct capture_counters capture_left_stats;
 static struct capture_counters capture_right_stats;
+static struct pwm_input_state left_input = {
+	.period_us = 20000U,
+	.pulse_us = ESC_MIN_PULSE_US,
+	.command = 0.0f,
+	.stale_count = CAPTURE_STALE_LIMIT + 1U,
+	.valid = false,
+};
+static struct pwm_input_state right_input = {
+	.period_us = 20000U,
+	.pulse_us = ESC_MIN_PULSE_US,
+	.command = 0.0f,
+	.stale_count = CAPTURE_STALE_LIMIT + 1U,
+	.valid = false,
+};
+static struct k_spinlock input_lock;
 K_THREAD_STACK_DEFINE(dashboard_thread_stack, 2048);
+K_THREAD_STACK_DEFINE(left_capture_thread_stack, 1024);
+K_THREAD_STACK_DEFINE(right_capture_thread_stack, 1024);
 
 static const struct plant_model model = {
 	.b = 0.25e-1f,
@@ -231,6 +259,38 @@ static bool update_motor_command(const struct pwm_dt_spec *spec,
 	*command = esc_pulse_to_command(*pulse_us);
 	*stale_count = 0U;
 	return true;
+}
+
+static void reset_pwm_input_state(struct pwm_input_state *input)
+{
+	input->period_us = 20000U;
+	input->pulse_us = ESC_MIN_PULSE_US;
+	input->command = 0.0f;
+	input->stale_count = CAPTURE_STALE_LIMIT + 1U;
+	input->valid = false;
+}
+
+static void pwm_capture_thread_fn(void *arg1, void *arg2, void *arg3)
+{
+	const struct pwm_dt_spec *spec = arg1;
+	struct pwm_input_state *input = arg2;
+	struct capture_counters *counters = arg3;
+	uint32_t period_us = 20000U;
+	uint32_t pulse_us = ESC_MIN_PULSE_US;
+	float command = 0.0f;
+	uint8_t stale_count = CAPTURE_STALE_LIMIT + 1U;
+
+	while (1) {
+		bool valid = update_motor_command(spec, &period_us, &pulse_us, &command,
+						  &stale_count, counters);
+		k_spinlock_key_t key = k_spin_lock(&input_lock);
+		input->period_us = period_us;
+		input->pulse_us = pulse_us;
+		input->command = command;
+		input->stale_count = stale_count;
+		input->valid = valid;
+		k_spin_unlock(&input_lock, key);
+	}
 }
 
 static void reset_capture_stats(void)
@@ -557,8 +617,6 @@ int main(void)
 		.right_pulse_us = ESC_MIN_PULSE_US,
 	};
 	enum plant_run_state current_state = PLANT_STATE_STANDBY;
-	uint8_t left_stale_count = CAPTURE_STALE_LIMIT + 1U;
-	uint8_t right_stale_count = CAPTURE_STALE_LIMIT + 1U;
 	int64_t last_step_ms;
 	int64_t next_release_ms;
 	int ret;
@@ -593,6 +651,18 @@ int main(void)
 
 	reset_timing_stats();
 	reset_capture_stats();
+	reset_pwm_input_state(&left_input);
+	reset_pwm_input_state(&right_input);
+	k_thread_create(&left_capture_thread, left_capture_thread_stack,
+			K_THREAD_STACK_SIZEOF(left_capture_thread_stack),
+			pwm_capture_thread_fn, (void *)&pwm_left, (void *)&left_input,
+			(void *)&capture_left_stats, K_LOWEST_APPLICATION_THREAD_PRIO,
+			0, K_NO_WAIT);
+	k_thread_create(&right_capture_thread, right_capture_thread_stack,
+			K_THREAD_STACK_SIZEOF(right_capture_thread_stack),
+			pwm_capture_thread_fn, (void *)&pwm_right, (void *)&right_input,
+			(void *)&capture_right_stats, K_LOWEST_APPLICATION_THREAD_PRIO,
+			0, K_NO_WAIT);
 	last_step_ms = k_uptime_get();
 	next_release_ms = last_step_ms + SAMPLE_TIME_MS;
 
@@ -603,22 +673,31 @@ int main(void)
 		int64_t now_ms;
 		int64_t dt_ms;
 		float dt_s;
+		bool left_valid;
+		bool right_valid;
 
 		if (plant_reset_requested) {
 			reset_plant_state(&state);
-			left_stale_count = CAPTURE_STALE_LIMIT + 1U;
-			right_stale_count = CAPTURE_STALE_LIMIT + 1U;
+			k_spinlock_key_t key = k_spin_lock(&input_lock);
+			reset_pwm_input_state(&left_input);
+			reset_pwm_input_state(&right_input);
+			k_spin_unlock(&input_lock, key);
 			current_state = PLANT_STATE_STANDBY;
 			plant_reset_requested = false;
 			print_run_state(current_state);
 		}
 
-		bool left_valid = update_motor_command(&pwm_left, &state.left_period_us,
-					       &state.left_pulse_us, &state.left_cmd,
-					       &left_stale_count, &capture_left_stats);
-		bool right_valid = update_motor_command(&pwm_right, &state.right_period_us,
-						&state.right_pulse_us, &state.right_cmd,
-						&right_stale_count, &capture_right_stats);
+		k_spinlock_key_t key = k_spin_lock(&input_lock);
+		state.left_period_us = left_input.period_us;
+		state.left_pulse_us = left_input.pulse_us;
+		state.left_cmd = left_input.command;
+		left_valid = left_input.valid;
+		state.right_period_us = right_input.period_us;
+		state.right_pulse_us = right_input.pulse_us;
+		state.right_cmd = right_input.command;
+		right_valid = right_input.valid;
+		k_spin_unlock(&input_lock, key);
+
 		enum plant_run_state next_state = detect_run_state(left_valid, right_valid, &state);
 
 		if (next_state != current_state) {
