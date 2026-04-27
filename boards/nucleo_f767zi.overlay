@@ -1,7 +1,7 @@
 / {
 	zephyr,user {
-		pwms = <&pwm_left 1 2040000 PWM_POLARITY_NORMAL>,
-		       <&pwm_right 1 2040000 PWM_POLARITY_NORMAL>;
+		pwms = <&pwm_left 1 20000000 PWM_POLARITY_NORMAL>,
+		       <&pwm_right 1 20000000 PWM_POLARITY_NORMAL>;
 		pwm-names = "left", "right";
 		io-channels = <&dac1 1>;
 		io-channel-names = "angle";
@@ -19,13 +19,13 @@
 	};
 };
 
-&timers12 {
+&timers5 {
 	st,prescaler = <107>;
 	status = "okay";
 
 	pwm_right: pwm {
 		status = "okay";
-		pinctrl-0 = <&tim12_ch1_pb14>;
+		pinctrl-0 = <&tim5_ch1_pa0>;
 		pinctrl-names = "default";
 	};
 };

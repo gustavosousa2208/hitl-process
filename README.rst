@@ -15,20 +15,19 @@ What it does
 Current hardware mapping
 ************************
 
-- Console UART: ``USART1`` on ``PA9``/``PA10`` at ``115200``
-- Left ESC PWM input: ``PB4`` (`TIM3_CH1`)
-- Right ESC PWM input: ``PB14`` (`TIM15_CH1`)
-- Simulated angle analog output: ``PA4`` (`DAC1_OUT1`, 0 to 3.3 V)
+- Console UART: ``USART3`` on ``PD8``/``PD9`` at ``115200``
+- Left ESC PWM input: ``PB4`` (`TIM3_CH1`, ST Zio ``CN7`` pin ``19`` / ``D25``)
+- Right ESC PWM input: ``PA0`` (`TIM5_CH1`, ST morpho ``CN11`` pin ``28``)
+- Simulated angle analog output: ``PA4`` (`DAC1_OUT1`, ST Zio ``CN7`` pin ``17`` / ``D24``, 0 to 3.3 V)
 
 Model assumptions
 *****************
 
-- The incoming ESC signal is the duty-based PWM described in the plant notes,
-  around ``490.2 Hz``.
+- The incoming ESC signal is PWM at ``50 Hz`` (``20 ms`` period).
 - ``1.0 ms`` high time means zero command.
-- ``1.5 ms`` high time means full command.
-- Values above ``1.5 ms`` are saturated, which tolerates ESC initialization
-  pulses up to ``2.0 ms``.
+- ``2.0 ms`` high time means full command.
+- Values between ``1.0 ms`` and ``2.0 ms`` are mapped linearly to
+  ``0`` to ``100 %`` throttle.
 - The analog output is scaled to reproduce the original potentiometer
   preprocessing:
 
